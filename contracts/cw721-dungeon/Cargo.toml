@@ -1,0 +1,23 @@
+[package]
+name = "cw721-dungeon"
+version = "0.1.0"
+edition = "2021"
+description = "CW721 NFT contract for Dungeon Chain heroes and gear"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+library = []
+
+[dependencies]
+cosmwasm-std = { version = "1.5", features = ["staking"] }
+cosmwasm-schema = "1.5"
+cw-storage-plus = "1.2"
+cw2 = "1.1"
+cw721 = "0.18"
+cw721-base = { version = "0.18", features = ["library"] }
+schemars = "0.8"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+thiserror = "1.0"
