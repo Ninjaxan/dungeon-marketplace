@@ -4,10 +4,10 @@ pub mod query;
 pub mod state;
 
 use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 
-use msg::{CustomExecuteMsg, Cw721DungeonContract, DungeonNftExtension, InstantiateMsg, QueryMsg};
+use msg::{CustomExecuteMsg, Cw721DungeonContract, InstantiateMsg, QueryMsg};
 
 const CONTRACT_NAME: &str = "crates.io:cw721-dungeon";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -21,7 +21,7 @@ pub fn instantiate(
 ) -> Result<Response, cw721_base::ContractError> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let contract = Cw721DungeonContract::default();
-    contract.instantiate(deps, env, info, msg)
+    Ok(contract.instantiate(deps, env, info, msg)?)
 }
 
 #[entry_point]
