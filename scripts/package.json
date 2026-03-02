@@ -1,0 +1,12 @@
+{
+  "name": "dungeon-marketplace-scripts",
+  "private": true,
+  "scripts": {
+    "deploy": "node deploy-contracts.js"
+  },
+  "dependencies": {
+    "@cosmjs/cosmwasm-stargate": "^0.32.4",
+    "@cosmjs/proto-signing": "^0.32.4",
+    "@cosmjs/stargate": "^0.32.4"
+  }
+}
