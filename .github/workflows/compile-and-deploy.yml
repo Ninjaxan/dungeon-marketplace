@@ -10,8 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust and wasm32 target
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust 1.81 and wasm32 target
+        uses: dtolnay/rust-toolchain@1.81.0
         with:
           targets: wasm32-unknown-unknown
 
