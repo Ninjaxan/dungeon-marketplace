@@ -10,42 +10,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust nightly and components
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust 1.75 and generate lock files
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: '1.75.0'
           targets: wasm32-unknown-unknown
-          components: rust-src
 
-      - name: Install wasm-opt (binaryen)
-        run: |
-          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_118/binaryen-version_118-x86_64-linux.tar.gz | tar xz
-          sudo cp binaryen-version_118/bin/wasm-opt /usr/local/bin/
-          wasm-opt --version
-
-      - name: Compile contracts
+      - name: Prepare individual contract builds
         run: |
           cd contracts
-          rm -f Cargo.lock
 
-          # Build with -Z build-std to recompile core/alloc WITHOUT bulk-memory
-          # This ensures NO bulk-memory or reference-types ops in the final WASM
-          RUSTFLAGS='-C link-arg=-s -C target-feature=-reference-types,-bulk-memory,-mutable-globals,-sign-ext,-multivalue' \
-            cargo +nightly build --release --target wasm32-unknown-unknown \
-            -Z build-std=core,alloc,std,panic_abort
+          # Generate workspace Cargo.lock with Rust 1.75 compatible deps
+          cargo generate-lockfile
 
-          mkdir -p artifacts
+          # Copy lock file into each contract for the optimizer
+          cp Cargo.lock cw721-dungeon/Cargo.lock
+          cp Cargo.lock marketplace/Cargo.lock
 
-          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
-            name=$(basename "$wasm")
-            echo "Processing $name ..."
-            cp "$wasm" "artifacts/$name"
+      - name: Compile CW721 contract
+        run: |
+          docker run --rm \
+            -v "$(pwd)/contracts/cw721-dungeon":/code \
+            --mount type=volume,source=cw721_cache,target=/target \
+            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+            cosmwasm/rust-optimizer:0.15.1
 
-            # Check for bulk-memory ops
-            echo "Checking for bulk-memory ops in $name..."
-            wasm-opt "artifacts/$name" --print-features 2>&1 || true
-          done
+          ls -lh contracts/cw721-dungeon/artifacts/ 2>/dev/null || echo "No artifacts"
 
-          ls -lh artifacts/
+      - name: Compile Marketplace contract
+        run: |
+          docker run --rm \
+            -v "$(pwd)/contracts/marketplace":/code \
+            --mount type=volume,source=marketplace_cache,target=/target \
+            --mount type=volume,source=registry_cache2,target=/usr/local/cargo/registry \
+            cosmwasm/rust-optimizer:0.15.1
+
+          ls -lh contracts/marketplace/artifacts/ 2>/dev/null || echo "No artifacts"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -61,8 +61,11 @@ jobs:
       - name: Copy artifacts
         run: |
           mkdir -p scripts/artifacts
-          cp contracts/artifacts/*.wasm scripts/artifacts/
+          cp contracts/cw721-dungeon/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || true
+          cp contracts/marketplace/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || true
+          echo "=== Artifacts ==="
           ls -lh scripts/artifacts/
+          test -f scripts/artifacts/*.wasm || (echo "ERROR: No .wasm files" && exit 1)
 
       - name: Deploy contracts
         env:
