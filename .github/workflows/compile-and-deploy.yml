@@ -20,15 +20,23 @@ jobs:
         run: |
           cd contracts
 
-          # Generate workspace Cargo.lock with Rust 1.75 compatible deps
+          # Hide workspace Cargo.toml so each contract generates its own lockfile
+          mv Cargo.toml Cargo.toml.bak
+
+          # Generate lockfile for cw721-dungeon
+          cd cw721-dungeon
           cargo generate-lockfile
-
-          # Pin base64ct to <1.7 (1.8+ requires edition2024 which Rust 1.75 can't parse)
           cargo update -p base64ct --precise 1.6.0
+          cd ..
 
-          # Copy lock file into each contract for the optimizer
-          cp Cargo.lock cw721-dungeon/Cargo.lock
-          cp Cargo.lock marketplace/Cargo.lock
+          # Generate lockfile for marketplace
+          cd marketplace
+          cargo generate-lockfile
+          cargo update -p base64ct --precise 1.6.0
+          cd ..
+
+          # Restore workspace Cargo.toml
+          mv Cargo.toml.bak Cargo.toml
 
       - name: Compile CW721 contract
         run: |
