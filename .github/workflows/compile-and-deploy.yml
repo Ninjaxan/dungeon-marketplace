@@ -31,8 +31,7 @@ jobs:
           # This ensures NO bulk-memory or reference-types ops in the final WASM
           RUSTFLAGS='-C link-arg=-s -C target-feature=-reference-types,-bulk-memory,-mutable-globals,-sign-ext,-multivalue' \
             cargo +nightly build --release --target wasm32-unknown-unknown \
-            -Z build-std=core,alloc,std,panic_abort \
-            -Z build-std-features=panic_immediate_abort
+            -Z build-std=core,alloc,std,panic_abort
 
           mkdir -p artifacts
 
