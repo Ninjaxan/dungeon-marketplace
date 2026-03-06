@@ -14,6 +14,11 @@
   --color-accent-red: #ef4444;
 }
 
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);

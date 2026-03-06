@@ -4,6 +4,7 @@ import { MarketplaceListing } from '@/lib/api/marketplace';
 import { CHAIN } from '@/lib/chain';
 import { formatDenom } from '@/lib/format';
 import { IpfsImage } from '../ui/IpfsImage';
+import { useToast } from '../ui/ToastProvider';
 import { BuyButton } from './BuyButton';
 import Link from 'next/link';
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function ListingDetail({ listing }: Props) {
+  const toast = useToast();
   const isAuction = listing.listingType === 'Auction';
   const isHero = listing.assetType === 'hero';
 
@@ -89,7 +91,7 @@ export function ListingDetail({ listing }: Props) {
           )}
 
           <BuyButton listing={listing} onSuccess={(txHash) => {
-            alert(`Transaction successful! Hash: ${txHash}`);
+            toast.show(`Transaction successful! Hash: ${txHash.slice(0, 16)}...`, 'success');
           }} />
         </div>
 

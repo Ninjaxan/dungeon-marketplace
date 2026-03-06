@@ -18,7 +18,7 @@ const { DirectSecp256k1HdWallet } = require("@cosmjs/proto-signing");
 const { GasPrice } = require("@cosmjs/stargate");
 
 // ---------- Config ----------
-const RPC_URL = process.env.RPC_URL || "https://rpc.dungeonchain.xyz";
+const RPC_URL = process.env.RPC_URL || "https://rpc.cosmos.directory/dungeon";
 const CHAIN_PREFIX = "dungeon";
 const DENOM = "udgn";
 const GAS_PRICE = GasPrice.fromString(`0.025${DENOM}`);

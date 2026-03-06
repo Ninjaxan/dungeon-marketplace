@@ -24,4 +24,21 @@ app.get('/health', (_, res) => {
     res.json({ status: 'ok', service: 'dungeon-marketplace', mints: mintCount });
 });
 
+// ── Settlement service (optional) ─────────────────────────────────────
+if (process.env.ENABLE_SETTLEMENT === 'true') {
+    const { startSettlementService } = require('./settlement');
+    startSettlementService();
+}
+
+// ── Manual settlement endpoint ────────────────────────────────────────
+const { settleAuction } = require('./settlement');
+app.post('/marketplace/settle/:listingId', async (req, res) => {
+    try {
+        const txHash = await settleAuction(req.params.listingId);
+        res.json({ ok: true, txHash });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 app.listen(PORT, () => console.log(`[Marketplace API] Listening on port ${PORT}`));

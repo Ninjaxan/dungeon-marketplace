@@ -8,6 +8,52 @@ const { uploadImage, uploadMetadata, resolveIpfsUrl } = require('./ipfs');
 
 const router = express.Router();
 
+// ── Rate limiter (in-memory, 30 req/min per IP) ────────────────────────────
+
+const _rateMap = new Map();
+function isRateLimited(ip) {
+    const now = Date.now();
+    let entry = _rateMap.get(ip);
+    if (!entry || now - entry.start > 60000) {
+        entry = { count: 0, start: now };
+        _rateMap.set(ip, entry);
+    }
+    entry.count++;
+    return entry.count > 30;
+}
+
+// ── Listing cache helpers ──────────────────────────────────────────────────
+
+const CACHE_TTL_SEC = 60;
+
+const cacheStmts = {
+    getMaxAge: db.prepare('SELECT MAX(cached_at) as max_at FROM listing_cache'),
+    getAll: db.prepare('SELECT * FROM listing_cache WHERE is_active = 1 ORDER BY listing_id DESC LIMIT ? OFFSET ?'),
+    upsert: db.prepare(`INSERT OR REPLACE INTO listing_cache
+        (listing_id, seller, nft_contract, token_id, listing_type, price, current_bid, expires_at, is_active, nft_name, nft_image, asset_type, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+    invalidate: db.prepare('UPDATE listing_cache SET is_active = 0 WHERE listing_id = ?'),
+    purge: db.prepare('DELETE FROM listing_cache'),
+};
+
+const refreshCache = db.transaction((listings) => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const l of listings) {
+        cacheStmts.upsert.run(
+            String(l.listing_id), l.seller, l.nft_contract, l.token_id,
+            l.listing_type || 'fixed', l.price || '0', l.current_bid || '0',
+            l.expires_at || 0, l.is_active ? 1 : 0,
+            l.nft_name || '', l.nft_image || '', l.asset_type || '', now
+        );
+    }
+});
+
+function isCacheFresh() {
+    const row = cacheStmts.getMaxAge.get();
+    if (!row || !row.max_at) return false;
+    return (Math.floor(Date.now() / 1000) - row.max_at) < CACHE_TTL_SEC;
+}
+
 // ── Env ─────────────────────────────────────────────────────────────────────
 
 const HOT_WALLET_MNEMONIC  = process.env.HOT_WALLET_MNEMONIC || '';
@@ -265,21 +311,49 @@ router.post('/mint-gear', requireAuth, async (req, res) => {
     }
 });
 
-// GET /marketplace/listings — Browse marketplace listings
+// GET /marketplace/listings — Browse marketplace listings (cached + rate-limited)
 router.get('/listings', async (req, res) => {
+    if (isRateLimited(req.ip)) {
+        return res.status(429).json({ ok: false, error: 'Too many requests. Try again in a minute.' });
+    }
+
     try {
-        const { contract, seller, start_after, limit } = req.query;
-        const listings = await queryListings({
-            nftContract: contract,
-            seller,
-            startAfter: start_after,
-            limit: limit ? parseInt(limit, 10) : 20,
-        });
-        return res.json({ ok: true, listings });
+        const { contract, seller, start_after } = req.query;
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+        const offset = parseInt(req.query.offset, 10) || 0;
+
+        // For filtered queries (by contract/seller), skip cache and go to chain
+        if (contract || seller) {
+            const listings = await queryListings({
+                nftContract: contract,
+                seller,
+                startAfter: start_after,
+                limit,
+            });
+            return res.json({ ok: true, listings });
+        }
+
+        // For unfiltered "all listings", use cache
+        if (isCacheFresh()) {
+            const cached = cacheStmts.getAll.all(limit, offset);
+            return res.json({ ok: true, listings: cached, cached: true });
+        }
+
+        // Cache stale — refresh from chain
+        const listings = await queryListings({ limit: 100 });
+        refreshCache(listings);
+        const page = cacheStmts.getAll.all(limit, offset);
+        return res.json({ ok: true, listings: page, cached: false });
     } catch (err) {
         console.error('[Marketplace] Listings error:', err.message);
         return res.status(500).json({ ok: false, error: err.message });
     }
+});
+
+// DELETE /marketplace/cache — Force invalidate listing cache
+router.delete('/cache', (req, res) => {
+    cacheStmts.purge.run();
+    return res.json({ ok: true });
 });
 
 // GET /marketplace/my-nfts — List user's minted NFTs
