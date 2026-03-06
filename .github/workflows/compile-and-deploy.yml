@@ -10,12 +10,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile contracts with CosmWasm workspace optimizer
+      - name: Install Rust and wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Compile contracts
         run: |
-          docker run --rm -v "$(pwd)/contracts":/code \
-            --mount type=volume,source=target_cache,target=/code/target \
-            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-            cosmwasm/workspace-optimizer:0.15.1
+          cd contracts
+          RUSTFLAGS='-C link-arg=-s -C target-feature=-reference-types' \
+            cargo build --release --target wasm32-unknown-unknown
+          mkdir -p artifacts
+          cp target/wasm32-unknown-unknown/release/cw721_dungeon.wasm artifacts/
+          cp target/wasm32-unknown-unknown/release/dungeon_marketplace.wasm artifacts/
+          # Optimize with wasm-opt if available
+          if command -v wasm-opt &> /dev/null; then
+            for f in artifacts/*.wasm; do
+              wasm-opt -Oz "$f" -o "$f.opt" && mv "$f.opt" "$f"
+            done
+          fi
+          ls -lh artifacts/
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
