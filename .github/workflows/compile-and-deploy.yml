@@ -76,7 +76,7 @@ jobs:
           cp contracts/marketplace/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || true
           echo "=== Artifacts ==="
           ls -lh scripts/artifacts/
-          test -f scripts/artifacts/*.wasm || (echo "ERROR: No .wasm files" && exit 1)
+          ls scripts/artifacts/*.wasm >/dev/null 2>&1 || (echo "ERROR: No .wasm files" && exit 1)
 
       - name: Deploy contracts
         env:
