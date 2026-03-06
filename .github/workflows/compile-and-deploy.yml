@@ -1,0 +1,46 @@
+name: Compile & Deploy Contracts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile contracts with CosmWasm optimizer
+        run: |
+          docker run --rm -v "$(pwd)/contracts":/code \
+            --mount type=volume,source=target_cache,target=/target \
+            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+            cosmwasm/optimizer:0.15.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          cd scripts
+          npm init -y
+          npm install @cosmjs/cosmwasm-stargate @cosmjs/proto-signing @cosmjs/stargate
+
+      - name: Copy artifacts
+        run: |
+          mkdir -p scripts/artifacts
+          cp contracts/artifacts/*.wasm scripts/artifacts/
+
+      - name: Deploy contracts
+        env:
+          HOT_WALLET_MNEMONIC: ${{ secrets.HOT_WALLET_MNEMONIC }}
+          RPC_URL: https://rpc.cosmos.directory/dungeon
+        run: node scripts/deploy-contracts.js
+
+      - name: Upload deployed addresses
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-addresses
+          path: scripts/deployed-addresses.txt
