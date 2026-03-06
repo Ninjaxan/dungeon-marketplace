@@ -50,7 +50,7 @@ jobs:
       - name: Deploy contracts
         env:
           HOT_WALLET_MNEMONIC: ${{ secrets.HOT_WALLET_MNEMONIC }}
-          RPC_URL: https://rpc.cosmos.directory/dungeon
+          RPC_URL: https://rpc.dungeonchain.xyz:443
         run: node scripts/deploy-contracts.js
 
       - name: Upload deployed addresses
