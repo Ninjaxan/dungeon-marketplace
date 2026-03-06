@@ -15,26 +15,23 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Install binaryen (wasm-opt)
-        run: |
-          sudo apt-get update && sudo apt-get install -y binaryen
-
-      - name: Compile contracts and optimize for MVP wasm
-        env:
-          RUSTFLAGS: "-C link-arg=-s"
+      - name: Compile contracts (MVP wasm only)
         run: |
           cd contracts
-          # Use Rust nightly for target-feature flags
-          rustup toolchain install nightly --target wasm32-unknown-unknown
-          RUSTFLAGS="-C link-arg=-s -C target-feature=-reference-types,-multivalue,-sign-ext,-bulk-memory" \
-            cargo +nightly build --release --target wasm32-unknown-unknown -Z build-std=std,panic_abort --target wasm32-unknown-unknown || \
+          # Create .cargo/config.toml at workspace root for cargo to find
+          mkdir -p .cargo
+          cat > .cargo/config.toml << 'TOML'
+          [target.wasm32-unknown-unknown]
+          rustflags = ["-C", "link-arg=-s", "-C", "target-feature=-reference-types,-multivalue,-sign-ext,-bulk-memory"]
+          TOML
+
+          # Clean any cached builds
+          cargo clean
           cargo build --release --target wasm32-unknown-unknown
+
           mkdir -p artifacts
-          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
-            name=$(basename "$wasm")
-            # wasm-opt with MVP features only — strips post-MVP opcodes
-            wasm-opt -Oz --mvp-features "$wasm" -o "artifacts/$name" 2>/dev/null || cp "$wasm" "artifacts/$name"
-          done
+          cp target/wasm32-unknown-unknown/release/cw721_dungeon.wasm artifacts/
+          cp target/wasm32-unknown-unknown/release/dungeon_marketplace.wasm artifacts/
           ls -lh artifacts/
 
       - name: Set up Node.js
