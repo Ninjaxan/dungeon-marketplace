@@ -82,8 +82,7 @@ jobs:
         env:
           HOT_WALLET_MNEMONIC: ${{ secrets.HOT_WALLET_MNEMONIC }}
           RPC_URL: http://67.218.8.89:26657
-          CW721_CODE_ID: "49"
-          MARKETPLACE_CODE_ID: "50"
+          # Fresh upload with ACCESS_EVERYBODY instantiate permission
         run: node scripts/deploy-contracts.js
 
       - name: Upload deployed addresses
