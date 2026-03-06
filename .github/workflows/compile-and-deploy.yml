@@ -37,8 +37,12 @@ jobs:
 
           for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
             name=$(basename "$wasm")
-            echo "Optimizing $name ..."
-            wasm-opt "$wasm" -Os -o "artifacts/$name"
+            echo "Processing $name ..."
+            cp "$wasm" "artifacts/$name"
+
+            # Check for bulk-memory ops
+            echo "Checking for bulk-memory ops in $name..."
+            wasm-opt "artifacts/$name" --print-features 2>&1 || true
           done
 
           ls -lh artifacts/
