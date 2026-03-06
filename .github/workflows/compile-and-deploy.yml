@@ -16,6 +16,8 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Compile contracts
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: "-C link-arg=-s -C target-feature=-reference-types,-multivalue,-sign-ext,-bulk-memory"
         run: |
           cd contracts
           cargo build --release --target wasm32-unknown-unknown
