@@ -25,7 +25,7 @@ jobs:
       - name: Compile contracts
         run: |
           cd contracts
-          RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown --locked
+          RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
 
           mkdir -p artifacts
           for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
