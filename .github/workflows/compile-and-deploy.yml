@@ -23,6 +23,9 @@ jobs:
           # Generate workspace Cargo.lock with Rust 1.75 compatible deps
           cargo generate-lockfile
 
+          # Pin base64ct to <1.7 (1.8+ requires edition2024 which Rust 1.75 can't parse)
+          cargo update -p base64ct --precise 1.6.0
+
           # Copy lock file into each contract for the optimizer
           cp Cargo.lock cw721-dungeon/Cargo.lock
           cp Cargo.lock marketplace/Cargo.lock
