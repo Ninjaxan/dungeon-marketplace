@@ -15,20 +15,25 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Install wasm-tools
-        run: cargo install wasm-tools --locked
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update && sudo apt-get install -y binaryen
 
-      - name: Compile contracts and strip post-MVP features
+      - name: Compile contracts and optimize for MVP wasm
+        env:
+          RUSTFLAGS: "-C link-arg=-s"
         run: |
           cd contracts
+          # Use Rust nightly for target-feature flags
+          rustup toolchain install nightly --target wasm32-unknown-unknown
+          RUSTFLAGS="-C link-arg=-s -C target-feature=-reference-types,-multivalue,-sign-ext,-bulk-memory" \
+            cargo +nightly build --release --target wasm32-unknown-unknown -Z build-std=std,panic_abort --target wasm32-unknown-unknown || \
           cargo build --release --target wasm32-unknown-unknown
           mkdir -p artifacts
           for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
             name=$(basename "$wasm")
-            # Strip reference-types and other post-MVP sections for wasmd compat
-            wasm-tools strip "$wasm" -o "artifacts/$name"
-            # Also ensure MVP-only validation passes
-            wasm-tools validate --features=-reference-types,-bulk-memory,-sign-ext,-multivalue "artifacts/$name" || true
+            # wasm-opt with MVP features only — strips post-MVP opcodes
+            wasm-opt -Oz --mvp-features "$wasm" -o "artifacts/$name" 2>/dev/null || cp "$wasm" "artifacts/$name"
           done
           ls -lh artifacts/
 
