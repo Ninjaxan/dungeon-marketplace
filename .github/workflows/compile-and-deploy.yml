@@ -20,7 +20,9 @@ jobs:
             --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
             cosmwasm/workspace-optimizer:0.16.0
 
-          ls -lh contracts/artifacts/
+          echo "=== Artifacts ==="
+          find contracts/ -name "*.wasm" -ls 2>/dev/null || true
+          ls -lhR contracts/artifacts/ 2>/dev/null || echo "No contracts/artifacts dir"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -36,7 +38,12 @@ jobs:
       - name: Copy artifacts
         run: |
           mkdir -p scripts/artifacts
-          cp contracts/artifacts/*.wasm scripts/artifacts/
+          # workspace-optimizer outputs to /code/artifacts (= contracts/artifacts/)
+          # File names use underscores: cw721_dungeon.wasm, dungeon_marketplace.wasm
+          cp contracts/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || \
+          cp contracts/target/wasm32-unknown-unknown/release/*.wasm scripts/artifacts/ 2>/dev/null || \
+          (echo "ERROR: No .wasm files found" && find . -name "*.wasm" -ls && exit 1)
+          ls -lh scripts/artifacts/
 
       - name: Deploy contracts
         env:
