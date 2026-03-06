@@ -10,10 +10,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust and wasm32 target
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust nightly and components
+        uses: dtolnay/rust-toolchain@nightly
         with:
           targets: wasm32-unknown-unknown
+          components: rust-src
 
       - name: Install wasm-opt (binaryen)
         run: |
@@ -25,14 +26,20 @@ jobs:
         run: |
           cd contracts
           rm -f Cargo.lock
-          RUSTFLAGS='-C link-arg=-s -C target-feature=-reference-types,-bulk-memory' \
-            cargo build --release --target wasm32-unknown-unknown
+
+          # Build with -Z build-std to recompile core/alloc WITHOUT bulk-memory
+          # This ensures NO bulk-memory or reference-types ops in the final WASM
+          RUSTFLAGS='-C link-arg=-s -C target-feature=-reference-types,-bulk-memory,-mutable-globals,-sign-ext,-multivalue' \
+            cargo +nightly build --release --target wasm32-unknown-unknown \
+            -Z build-std=core,alloc,std,panic_abort \
+            -Z build-std-features=panic_immediate_abort
 
           mkdir -p artifacts
+
           for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
             name=$(basename "$wasm")
             echo "Optimizing $name ..."
-            wasm-opt "$wasm" -Os --enable-sign-ext --disable-reference-types --disable-bulk-memory -o "artifacts/$name"
+            wasm-opt "$wasm" -Os -o "artifacts/$name"
           done
 
           ls -lh artifacts/
