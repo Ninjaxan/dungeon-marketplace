@@ -10,19 +10,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile contracts (workspace-optimizer)
+      - name: Compile CW721 contract
         run: |
-          # workspace-optimizer expects Cargo.toml at the mount root
-          # Mount the contracts/ dir as /code so it finds the workspace
           docker run --rm \
-            -v "$(pwd)/contracts":/code \
-            --mount type=volume,source=contracts_cache,target=/target \
+            -v "$(pwd)/contracts/cw721-dungeon":/code \
+            -v "$(pwd)/contracts":/contracts_workspace \
+            --mount type=volume,source=cw721_cache,target=/target \
             --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-            cosmwasm/workspace-optimizer:0.16.0
+            -e CARGO_MANIFEST_DIR=/code \
+            cosmwasm/rust-optimizer:0.16.0
 
-          echo "=== Artifacts ==="
-          find contracts/ -name "*.wasm" -ls 2>/dev/null || true
-          ls -lhR contracts/artifacts/ 2>/dev/null || echo "No contracts/artifacts dir"
+          ls -lh contracts/cw721-dungeon/artifacts/ 2>/dev/null || true
+
+      - name: Compile Marketplace contract
+        run: |
+          docker run --rm \
+            -v "$(pwd)/contracts/marketplace":/code \
+            --mount type=volume,source=marketplace_cache,target=/target \
+            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+            cosmwasm/rust-optimizer:0.16.0
+
+          ls -lh contracts/marketplace/artifacts/ 2>/dev/null || true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -38,12 +46,19 @@ jobs:
       - name: Copy artifacts
         run: |
           mkdir -p scripts/artifacts
-          # workspace-optimizer outputs to /code/artifacts (= contracts/artifacts/)
-          # File names use underscores: cw721_dungeon.wasm, dungeon_marketplace.wasm
-          cp contracts/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || \
-          cp contracts/target/wasm32-unknown-unknown/release/*.wasm scripts/artifacts/ 2>/dev/null || \
-          (echo "ERROR: No .wasm files found" && find . -name "*.wasm" -ls && exit 1)
+          echo "=== Finding all .wasm files ==="
+          find . -name "*.wasm" -ls
+
+          # rust-optimizer outputs to /code/artifacts/ inside each contract dir
+          cp contracts/cw721-dungeon/artifacts/cw721_dungeon.wasm scripts/artifacts/ 2>/dev/null || \
+          cp contracts/cw721-dungeon/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || true
+
+          cp contracts/marketplace/artifacts/dungeon_marketplace.wasm scripts/artifacts/ 2>/dev/null || \
+          cp contracts/marketplace/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || true
+
+          echo "=== Final artifacts ==="
           ls -lh scripts/artifacts/
+          test -f scripts/artifacts/*.wasm || (echo "ERROR: No .wasm artifacts" && exit 1)
 
       - name: Deploy contracts
         env:
