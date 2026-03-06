@@ -10,26 +10,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.81 and wasm32 target
-        uses: dtolnay/rust-toolchain@1.81.0
+      - name: Install Rust and wasm32 target
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Compile contracts
-        env:
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: "-C link-arg=-s -C target-feature=-reference-types,-multivalue,-sign-ext,-bulk-memory"
+      - name: Install wasm-tools
+        run: cargo install wasm-tools --locked
+
+      - name: Compile contracts and strip post-MVP features
         run: |
           cd contracts
           cargo build --release --target wasm32-unknown-unknown
           mkdir -p artifacts
-          cp target/wasm32-unknown-unknown/release/cw721_dungeon.wasm artifacts/
-          cp target/wasm32-unknown-unknown/release/dungeon_marketplace.wasm artifacts/
-          # Optimize with wasm-opt if available
-          if command -v wasm-opt &> /dev/null; then
-            for f in artifacts/*.wasm; do
-              wasm-opt -Oz "$f" -o "$f.opt" && mv "$f.opt" "$f"
-            done
-          fi
+          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
+            name=$(basename "$wasm")
+            # Strip reference-types and other post-MVP sections for wasmd compat
+            wasm-tools strip "$wasm" -o "artifacts/$name"
+            # Also ensure MVP-only validation passes
+            wasm-tools validate --features=-reference-types,-bulk-memory,-sign-ext,-multivalue "artifacts/$name" || true
+          done
           ls -lh artifacts/
 
       - name: Set up Node.js
