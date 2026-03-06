@@ -10,27 +10,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile CW721 contract
+      - name: Install Rust 1.78 and wasm32 target
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.78.0'
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-opt (binaryen)
         run: |
-          docker run --rm \
-            -v "$(pwd)/contracts/cw721-dungeon":/code \
-            -v "$(pwd)/contracts":/contracts_workspace \
-            --mount type=volume,source=cw721_cache,target=/target \
-            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-            -e CARGO_MANIFEST_DIR=/code \
-            cosmwasm/rust-optimizer:0.16.0
+          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_118/binaryen-version_118-x86_64-linux.tar.gz | tar xz
+          sudo cp binaryen-version_118/bin/wasm-opt /usr/local/bin/
+          wasm-opt --version
 
-          ls -lh contracts/cw721-dungeon/artifacts/ 2>/dev/null || true
-
-      - name: Compile Marketplace contract
+      - name: Compile contracts
         run: |
-          docker run --rm \
-            -v "$(pwd)/contracts/marketplace":/code \
-            --mount type=volume,source=marketplace_cache,target=/target \
-            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-            cosmwasm/rust-optimizer:0.16.0
+          cd contracts
+          RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown --locked
 
-          ls -lh contracts/marketplace/artifacts/ 2>/dev/null || true
+          mkdir -p artifacts
+          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
+            name=$(basename "$wasm")
+            echo "Optimizing $name ..."
+            wasm-opt "$wasm" -Os --mvp -o "artifacts/$name"
+          done
+
+          ls -lh artifacts/
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -46,19 +50,8 @@ jobs:
       - name: Copy artifacts
         run: |
           mkdir -p scripts/artifacts
-          echo "=== Finding all .wasm files ==="
-          find . -name "*.wasm" -ls
-
-          # rust-optimizer outputs to /code/artifacts/ inside each contract dir
-          cp contracts/cw721-dungeon/artifacts/cw721_dungeon.wasm scripts/artifacts/ 2>/dev/null || \
-          cp contracts/cw721-dungeon/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || true
-
-          cp contracts/marketplace/artifacts/dungeon_marketplace.wasm scripts/artifacts/ 2>/dev/null || \
-          cp contracts/marketplace/artifacts/*.wasm scripts/artifacts/ 2>/dev/null || true
-
-          echo "=== Final artifacts ==="
+          cp contracts/artifacts/*.wasm scripts/artifacts/
           ls -lh scripts/artifacts/
-          test -f scripts/artifacts/*.wasm || (echo "ERROR: No .wasm artifacts" && exit 1)
 
       - name: Deploy contracts
         env:
