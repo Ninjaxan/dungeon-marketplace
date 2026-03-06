@@ -91,31 +91,44 @@ async function main() {
     console.error("WARNING: Low balance — may not have enough gas for deployment");
   }
 
-  // Step 1: Store CW721 contract
-  console.log("\n=== Step 1: Store CW721 contract ===");
-  const cw721Wasm = fs.readFileSync(CW721_WASM);
-  console.log(`  WASM size: ${(cw721Wasm.length / 1024).toFixed(0)} KB`);
-  const cw721StoreResult = await client.upload(account.address, cw721Wasm, "auto");
-  console.log(`  Code ID: ${cw721StoreResult.codeId}`);
-  console.log(`  Tx hash: ${cw721StoreResult.transactionHash}`);
+  // Allow reusing already-stored code IDs (skip upload)
+  const ACCESS_EVERYBODY = 3;
+  const instantiatePerm = { permission: ACCESS_EVERYBODY, addresses: [] };
 
-  await sleep(3000);
+  let cw721CodeId = process.env.CW721_CODE_ID ? parseInt(process.env.CW721_CODE_ID) : 0;
+  let mktCodeId = process.env.MARKETPLACE_CODE_ID ? parseInt(process.env.MARKETPLACE_CODE_ID) : 0;
 
-  // Step 2: Store Marketplace contract
-  console.log("\n=== Step 2: Store Marketplace contract ===");
-  const mktWasm = fs.readFileSync(MARKETPLACE_WASM);
-  console.log(`  WASM size: ${(mktWasm.length / 1024).toFixed(0)} KB`);
-  const mktStoreResult = await client.upload(account.address, mktWasm, "auto");
-  console.log(`  Code ID: ${mktStoreResult.codeId}`);
-  console.log(`  Tx hash: ${mktStoreResult.transactionHash}`);
+  if (!cw721CodeId) {
+    console.log("\n=== Step 1: Store CW721 contract ===");
+    const cw721Wasm = fs.readFileSync(CW721_WASM);
+    console.log(`  WASM size: ${(cw721Wasm.length / 1024).toFixed(0)} KB`);
+    const cw721StoreResult = await client.upload(account.address, cw721Wasm, "auto", undefined, instantiatePerm);
+    cw721CodeId = cw721StoreResult.codeId;
+    console.log(`  Code ID: ${cw721CodeId}`);
+    console.log(`  Tx hash: ${cw721StoreResult.transactionHash}`);
+    await sleep(3000);
+  } else {
+    console.log(`\n=== Step 1: Using existing CW721 Code ID: ${cw721CodeId} ===`);
+  }
 
-  await sleep(3000);
+  if (!mktCodeId) {
+    console.log("\n=== Step 2: Store Marketplace contract ===");
+    const mktWasm = fs.readFileSync(MARKETPLACE_WASM);
+    console.log(`  WASM size: ${(mktWasm.length / 1024).toFixed(0)} KB`);
+    const mktStoreResult = await client.upload(account.address, mktWasm, "auto", undefined, instantiatePerm);
+    mktCodeId = mktStoreResult.codeId;
+    console.log(`  Code ID: ${mktCodeId}`);
+    console.log(`  Tx hash: ${mktStoreResult.transactionHash}`);
+    await sleep(3000);
+  } else {
+    console.log(`\n=== Step 2: Using existing Marketplace Code ID: ${mktCodeId} ===`);
+  }
 
   // Step 3: Instantiate Hero NFT contract
   console.log("\n=== Step 3: Instantiate Hero NFT contract ===");
   const heroResult = await client.instantiate(
     account.address,
-    cw721StoreResult.codeId,
+    cw721CodeId,
     {
       name: "Dungeon Heroes",
       symbol: "DHERO",
@@ -135,7 +148,7 @@ async function main() {
   console.log("\n=== Step 4: Instantiate Gear NFT contract ===");
   const gearResult = await client.instantiate(
     account.address,
-    cw721StoreResult.codeId,
+    cw721CodeId,
     {
       name: "Dungeon Gear",
       symbol: "DGEAR",
@@ -155,7 +168,7 @@ async function main() {
   console.log("\n=== Step 5: Instantiate Marketplace contract ===");
   const mktResult = await client.instantiate(
     account.address,
-    mktStoreResult.codeId,
+    mktCodeId,
     {
       treasury: TREASURY,
       royalty_bps: ROYALTY_BPS,
@@ -187,8 +200,8 @@ async function main() {
       `HERO_NFT_CONTRACT=${heroContract}`,
       `GEAR_NFT_CONTRACT=${gearContract}`,
       `MARKETPLACE_CONTRACT=${mktContract}`,
-      `CW721_CODE_ID=${cw721StoreResult.codeId}`,
-      `MARKETPLACE_CODE_ID=${mktStoreResult.codeId}`,
+      `CW721_CODE_ID=${cw721CodeId}`,
+      `MARKETPLACE_CODE_ID=${mktCodeId}`,
       `DEPLOYER=${account.address}`,
       `DEPLOYED_AT=${new Date().toISOString()}`,
     ].join("\n")
