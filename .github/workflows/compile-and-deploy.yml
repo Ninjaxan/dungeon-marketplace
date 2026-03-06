@@ -25,14 +25,14 @@ jobs:
         run: |
           cd contracts
           rm -f Cargo.lock
-          RUSTFLAGS='-C link-arg=-s -C target-feature=-reference-types,-multivalue,-sign-ext,-bulk-memory' \
+          RUSTFLAGS='-C link-arg=-s -C target-feature=-reference-types' \
             cargo build --release --target wasm32-unknown-unknown
 
           mkdir -p artifacts
           for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
             name=$(basename "$wasm")
             echo "Optimizing $name ..."
-            wasm-opt "$wasm" -Os --disable-reference-types --disable-multivalue --disable-sign-ext --disable-bulk-memory -o "artifacts/$name"
+            wasm-opt "$wasm" -Os --disable-reference-types -o "artifacts/$name"
           done
 
           ls -lh artifacts/
