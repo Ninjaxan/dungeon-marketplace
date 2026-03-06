@@ -2,12 +2,13 @@ import { CHAIN } from './chain';
 
 const STORAGE_KEY = 'dungeon_wallet';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type OfflineSigner = any;
+
 interface WalletProvider {
   experimentalSuggestChain(config: unknown): Promise<void>;
   enable(chainId: string): Promise<void>;
-  getOfflineSigner(chainId: string): {
-    getAccounts(): Promise<{ address: string; pubkey: Uint8Array }[]>;
-  };
+  getOfflineSigner(chainId: string): OfflineSigner;
 }
 
 interface ProviderWindow {
