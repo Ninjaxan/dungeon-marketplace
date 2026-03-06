@@ -32,7 +32,7 @@ jobs:
           for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
             name=$(basename "$wasm")
             echo "Optimizing $name ..."
-            wasm-opt "$wasm" -Os --disable-reference-types -o "artifacts/$name"
+            wasm-opt "$wasm" -Os --enable-bulk-memory --enable-sign-ext --disable-reference-types -o "artifacts/$name"
           done
 
           ls -lh artifacts/
